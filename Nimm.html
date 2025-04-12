@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naschkatze</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .candies {
+            margin: 20px auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .candy {
+            width: 40px;
+            height: 40px;
+            margin: 5px;
+            background-color: #ff6347; /* Tomatenrot für realistischere Bonbons */
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .candy::before, .candy::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #fff;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Naschkatze</h1>
+    <p id="status">Verbleibende Zuckerl: 18</p>
+    <div class="candies" id="candies"></div>
+    <p>Drücke auf einen der Buttons, um Zuckerl zu nehmen:</p>
+    <button onclick="playerMove(1)">1 Zuckerl</button>
+    <button onclick="playerMove(2)">2 Zuckerl</button>
+    <button onclick="playerMove(3)">3 Zuckerl</button>
+    <p id="rules" style="font-style: italic; position: absolute; bottom: 10px; width: 100%;">Spielregeln: Es gibt 18 Zuckerl. Du und der Computer nehmen abwechselnd 1, 2 oder 3 Zuckerl. Wer das letzte Zuckerl nimmt, verliert.</p>
+    <div id="spokenText" style="margin-top: 20px; font-size: 18px;"></div>
+
+    <script>
+        let candies = 18;
+        let playerTurn = true;
+
+        function renderCandies() {
+            const candiesDiv = document.getElementById('candies');
+            candiesDiv.innerHTML = '';
+            for (let i = 0; i < candies; i++) {
+                const candy = document.createElement('div');
+                candy.className = 'candy';
+                candiesDiv.appendChild(candy);
+            }
+            document.getElementById('status').textContent = `Verbleibende Zuckerl: ${candies}`;
+        }
+
+        function updateSpokenText(message) {
+            const spokenTextDiv = document.getElementById('spokenText');
+            spokenTextDiv.textContent = message;
+            spokenTextDiv.style.color = 'green';
+        }
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'de-DE';
+            utterance.voice = speechSynthesis.getVoices().find(voice => voice.name === 'Viktor');
+            speechSynthesis.speak(utterance);
+            updateSpokenText(text);
+        }
+
+        function playerMove(amount) {
+            if (!playerTurn || candies < amount) return;
+            candies -= amount;
+            const message = `Du hast ${amount} Zuckerl genommen. Verbleibende Zuckerl: ${candies}`;
+            speak(message);
+            playerTurn = false;
+            renderCandies();
+            checkGameOver();
+            if (!playerTurn) setTimeout(computerMove, 1000);
+        }
+
+        function computerMove() {
+            let aiMove = (candies - 1) % 4;
+            if (aiMove === 0 || aiMove > candies) {
+                aiMove = Math.min(3, candies);
+            }
+            candies -= aiMove;
+            const message = `Computer hat ${aiMove} Zuckerl genommen. Verbleibende Zuckerl: ${candies}`;
+            speak(message);
+            playerTurn = true;
+            renderCandies();
+            checkGameOver();
+        }
+
+        function announceVictory(message) {
+            speak(message);
+            const status = document.getElementById('status');
+            status.style.color = 'green';
+            status.textContent = message;
+        }
+
+        function checkGameOver() {
+            if (candies === 0) {
+                const message = playerTurn ? 'Spiel vorbei! Du hast gewonnen!' : 'Spiel vorbei! Der Computer hat gewonnen!';
+                alert(message);
+                announceVictory(message);
+                candies = 18;
+                playerTurn = true;
+                renderCandies();
+            }
+        }
+
+        renderCandies();
+    </script>
+</body>
+</html>
