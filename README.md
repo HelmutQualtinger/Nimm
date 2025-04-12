@@ -1,39 +1,18 @@
-```markdown
-```markdown
 # Nimm Projekt Dokumentation
 
 ## Übersicht
 
-Das Nimm-Projekt besteht aus zwei Hauptkomponenten: `Nimm.html` und `Nimm.py`. Diese README bietet eine Übersicht über deren Funktionalität und Nutzung.
+Das Nimm-Projekt besteht aus zwei Variante: `Nimm.html` mit Javascript und `Nimm.py` für lokale Ausführung mittels Pygame. Diese README bietet eine Übersicht über deren Funktionalität und Nutzung.
 
 ## Nimm.py
 
-`Nimm.py` ist ein Python-Skript, das die Logik für das Nimm-Spiel implementiert. Es enthält Funktionen zur Handhabung der Spielmechanik, wie Spielerzüge, Zugvalidierung und die Bestimmung des Gewinners.
+`Nimm.py` ist ein Python-Skript, das die Logik für das Nimm-Spiel implementiert. Es enthält Funktionen zur Handhabung der Spielmechanik, wie Spielerzüge, Zugvalidierung und die Bestimmung des Gewinners und Sprachausgabe.
 
 ### Hauptfunktionen
 
 - **Spielmechanik**  
-    Diese Funktionen ermöglichen die Durchführung des Spiels, einschließlich der Verwaltung der verbleibenden Objekte und der Überprüfung der Spielregeln.
 
-    ```python
-    def make_move(objects, take):
-        """
-        Führt einen Spielzug aus, indem eine bestimmte Anzahl von Objekten entfernt wird.
-
-        Args:
-            objects (int): Die aktuelle Anzahl der Objekte im Spiel.
-            take (int): Die Anzahl der zu entfernenden Objekte.
-
-        Returns:
-            int: Die verbleibende Anzahl der Objekte nach dem Zug.
-
-        Raises:
-            ValueError: Wenn die Anzahl der zu entfernenden Objekte ungültig ist.
-        """
-        if take <= 0 or take > objects:
-            raise ValueError("Ungültiger Zug. Anzahl der zu entfernenden Objekte muss zwischen 1 und der verbleibenden Anzahl liegen.")
-        return objects - take
-    ```
+Diese Funktionen ermöglichen die Durchführung des Spiels, einschließlich der Verwaltung der verbleibenden Objekte und der Überprüfung der Spielregeln.
 
 ## Nimm.html
 
@@ -48,16 +27,19 @@ Das Nimm-Projekt besteht aus zwei Hauptkomponenten: `Nimm.html` und `Nimm.py`. D
 ## Nutzung
 
 1. Klonen Sie das Repository:
+
      ```bash
      git clone https://github.com/yourusername/Nimm.git
      ```
+
 2. Führen Sie das Python-Skript aus:
+
      ```bash
      python Nimm.py
      ```
+
 3. Öffnen Sie `Nimm.html` in einem Webbrowser, um das Spiel zu starten.
 
 ## Lizenz
 
 Dieses Projekt ist unter der MIT-Lizenz lizenziert. Details finden Sie in der Datei `LICENSE`.
-```
