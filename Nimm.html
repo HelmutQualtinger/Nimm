@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Naschkatze - Nim-Spiel</title>
+    <title>Naschkatze</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            background-color: #18a0ea;
         }
         .game-container {
             display: flex;
@@ -26,7 +26,7 @@
             min-width: 120px; /* Etwas schmaler für 4 Haufen */
             max-width: 22%; /* Begrenzt die Breite für besseres Layout bei 4 Haufen */
             cursor: pointer;
-            background-color: #fff;
+            background-color: #ffffff;
             border-radius: 10px;
             transition: all 0.3s;
             position: relative; /* Für die Positionierung des Welleneffekts */
@@ -63,7 +63,7 @@
             background-color: #f0f0f0;
             border: 1px solid #ccc;
             border-radius: 5px;
-            transition: background-color 0.3s;
+            transition: background-color 0.7s;
         }
         button:hover {
             background-color: #e0e0e0;
@@ -90,7 +90,7 @@
             margin-top: 20px;
             font-size: 18px;
             min-height: 30px;
-            color: #4CAF50;
+            color: #7b1a1a;
         }
         /* Verbesserte Welleneffekt-Animation */
         @keyframes ripple {
@@ -99,7 +99,7 @@
                 opacity: 0.7;
             }
             100% {
-                transform: scale(3);
+                transform: scale(10);
                 opacity: 0;
             }
         }
@@ -118,7 +118,7 @@
     </style>
 </head>
 <body>
-    <h1>Naschkatze - Nim-Spiel</h1>
+    <h1>Naschkatze</h1>
     <p id="status">Wähle einen Haufen und nimm dann 1, 2 oder 3 Zuckerl.</p>
     <div class="game-container" id="game-container"></div>
     <div class="buttons-container">
@@ -134,7 +134,8 @@
         // let piles = [3, 5, 7, 9]; // Entferne feste Startwerte
         let playerTurn = true;
         let selectedPile = -1; // -1 bedeutet kein Haufen ausgewählt
-        const candyImageUrl = 'https://cdn-icons-png.flaticon.com/512/119/119534.png';
+        const candyImageUrl = 'https://img.lovepik.com/free-png/20211209/lovepik-candy-orange-icon-png-image_401435057_wh1200.png'; // URL für Zuckerl-Bild
+      const takeSoundVolume = 0.25; // Lautstärke für den Sound
         let piles = []; // Wird in initGame initialisiert
 
         // Hilfsfunktion zum Generieren zufälliger Haufengrößen
@@ -223,7 +224,7 @@
         function createRippleEffect(e, pileIndex) {
             // Direktes Ansprechen des Haufen-Elements für den Effekt
             const pileElements = document.querySelectorAll('.pile');
-            if (!pileElements || pileElements.length <= pileIndex) return;
+            if (!pileElements || pileElements.length > pileIndex) return;
             
             const pileElement = pileElements[pileIndex];
             
@@ -298,10 +299,31 @@
             spokenTextDiv.textContent = message;
         }
 
-        // Text vorlesen und anzeigen
-        function speak(text) {
+        // Text vorlesen und anzeigen, mit optionalem Callback nach Ende der Sprache
+        function speak(text, callback) {
+            // Aktuell laufende Sprache abbrechen, falls vorhanden
+            speechSynthesis.cancel(); 
+            
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'de-DE';
+            
+            // Callback hinzufügen, wenn die Sprache beendet ist
+            if (callback && typeof callback === 'function') {
+                utterance.onend = callback;
+            } else {
+                // Standard-Verhalten, wenn kein Callback übergeben wird
+                utterance.onend = null; 
+            }
+            
+            // Fehlerbehandlung für Sprachsynthese
+            utterance.onerror = (event) => {
+                console.error('SpeechSynthesisUtterance.onerror', event);
+                // Führe den Callback trotzdem aus, um das Spiel nicht zu blockieren
+                if (callback && typeof callback === 'function') {
+                    callback();
+                }
+            };
+
             speechSynthesis.speak(utterance);
             updateSpokenText(text);
         }
@@ -333,7 +355,6 @@
             const originalAmount = piles[selectedPile]; // Menge vor dem Zug
             piles[selectedPile] -= amount;
             const message = `Du hast ${amount} Zuckerl von Haufen ${selectedPile + 1} genommen.`;
-            speak(message);
             
             // Sound abspielen, wenn Spieler Zuckerl nimmt
             playTakeSound(amount); // amount ist korrekt hier
@@ -345,96 +366,111 @@
             
             if (checkGameOver()) return;
             
-            // Computer ist dran nach kurzer Verzögerung
-            setTimeout(computerMove, 1500);
+            // Computer ist dran, NACHDEM die Sprachausgabe beendet ist
+            speak(message, () => {
+                // Kurze zusätzliche Verzögerung, bevor der Computer "denkt"
+                setTimeout(computerMove, 500); 
+            });
         }
 
-        // Computerzug - Überarbeitet für korrekten Sound-Aufruf
+        // Computerzug - Überarbeitet für korrekten Sound-Aufruf und Sprach-Timing
         function computerMove() {
-            speak("Computer überlegt...");
-            
-            setTimeout(() => {
-                const nimSum = calculateNimSum();
-                let moveMade = false;
-                let pileIndex = -1;
-                let amountToTake = 0; // Variable für die genommene Menge
+            // Zuerst "Computer überlegt..." sagen
+            speak("Computer überlegt...", () => {
+                // Erst NACHDEM "Computer überlegt..." gesagt wurde, die Logik ausführen
+                // Kurze Verzögerung für die "Denkpause"
+                setTimeout(() => {
+                    const nimSum = calculateNimSum();
+                    let moveMade = false;
+                    let pileIndex = -1;
+                    let amountToTake = 0; // Variable für die genommene Menge
 
-                if (nimSum !== 0) {
-                    // Perfekte Strategie
-                    for (let i = 0; i < piles.length; i++) {
-                        if (piles[i] > 0) {
-                            const targetSize = piles[i] ^ nimSum;
-                            if (targetSize < piles[i]) {
-                                const potentialAmount = piles[i] - targetSize;
-                                if (potentialAmount <= 3) {
-                                    pileIndex = i;
-                                    amountToTake = potentialAmount;
-                                    moveMade = true;
-                                    break;
+                    if (nimSum !== 0) {
+                        // Perfekte Strategie
+                        for (let i = 0; i < piles.length; i++) {
+                            if (piles[i] > 0) {
+                                const targetSize = piles[i] ^ nimSum;
+                                if (targetSize < piles[i]) {
+                                    const potentialAmount = piles[i] - targetSize;
+                                    if (potentialAmount <= 3) {
+                                        pileIndex = i;
+                                        amountToTake = potentialAmount;
+                                        moveMade = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
+                        
+                        // Alternative Strategie
+                        if (!moveMade) {
+                            const largeHaufen = piles.findIndex(pile => pile > 3);
+                            if (largeHaufen !== -1) {
+                                let bestAmount = 1;
+                                let bestNimSum = calculateNimSumAfterMove(largeHaufen, 1);
+                                for (let amount = 2; amount <= 3; amount++) {
+                                    const afterNimSum = calculateNimSumAfterMove(largeHaufen, amount);
+                                    if (afterNimSum < bestNimSum) {
+                                        bestNimSum = afterNimSum;
+                                        bestAmount = amount;
+                                    }
+                                }
+                                pileIndex = largeHaufen;
+                                amountToTake = bestAmount;
+                                moveMade = true;
+                            }
+                        }
                     }
-                    
-                    // Alternative Strategie
+
+                    // Fallback-Strategie
                     if (!moveMade) {
-                        const largeHaufen = piles.findIndex(pile => pile > 3);
-                        if (largeHaufen !== -1) {
-                            let bestAmount = 1;
-                            let bestNimSum = calculateNimSumAfterMove(largeHaufen, 1);
-                            for (let amount = 2; amount <= 3; amount++) {
-                                const afterNimSum = calculateNimSumAfterMove(largeHaufen, amount);
-                                if (afterNimSum < bestNimSum) {
-                                    bestNimSum = afterNimSum;
-                                    bestAmount = amount;
-                                }
+                        let largestPileIndex = -1;
+                        let maxCandies = 0;
+                        for (let i = 0; i < piles.length; i++) {
+                            if (piles[i] > maxCandies) {
+                                maxCandies = piles[i];
+                                largestPileIndex = i;
                             }
-                            pileIndex = largeHaufen;
-                            amountToTake = bestAmount;
-                            moveMade = true;
+                        }
+                        
+                        if (largestPileIndex !== -1) {
+                            pileIndex = largestPileIndex;
+                            const nonEmptyPiles = piles.filter(pile => pile > 0).length;
+                            if (nonEmptyPiles === 1) {
+                                const potentialAmount = maxCandies === 1 ? 1 : (maxCandies % 2 === 0 ? maxCandies : maxCandies - 1);
+                                amountToTake = Math.min(3, potentialAmount);
+                            } else {
+                                amountToTake = Math.min(3, Math.max(1, maxCandies <= 4 ? maxCandies - 1 : 1));
+                            }
+                            moveMade = true; // Auch hier wurde ein Zug gemacht
                         }
                     }
-                }
 
-                // Fallback-Strategie
-                if (!moveMade) {
-                    let largestPileIndex = -1;
-                    let maxCandies = 0;
-                    for (let i = 0; i < piles.length; i++) {
-                        if (piles[i] > maxCandies) {
-                            maxCandies = piles[i];
-                            largestPileIndex = i;
-                        }
-                    }
-                    
-                    if (largestPileIndex !== -1) {
-                        pileIndex = largestPileIndex;
-                        const nonEmptyPiles = piles.filter(pile => pile > 0).length;
-                        if (nonEmptyPiles === 1) {
-                            const potentialAmount = maxCandies === 1 ? 1 : (maxCandies % 2 === 0 ? maxCandies : maxCandies - 1);
-                            amountToTake = Math.min(3, potentialAmount);
-                        } else {
-                            amountToTake = Math.min(3, Math.max(1, maxCandies <= 4 ? maxCandies - 1 : 1));
-                        }
-                        moveMade = true; // Auch hier wurde ein Zug gemacht
-                    }
-                }
 
-                // Führe den Zug aus und spiele den Sound
-                if (moveMade && pileIndex !== -1 && amountToTake > 0) {
-                    piles[pileIndex] -= amountToTake;
-                    const message = `Computer nimmt ${amountToTake} Zuckerl von Haufen ${pileIndex + 1}.`;
-                    speak(message);
-                    playTakeSound(amountToTake, true); // Sound hier abspielen
-                } else {
-                    // Sollte nicht passieren, wenn noch Züge möglich sind
-                    console.error("Computer konnte keinen Zug ausführen.");
-                }
-                
-                playerTurn = true;
-                renderPiles();
-                checkGameOver();
-            }, 1000);
+                    // Führe den Zug aus, spiele den Sound und sage den Zug an
+                    if (moveMade && pileIndex !== -1 && amountToTake > 0) {
+                        piles[pileIndex] -= amountToTake;
+                        const computerMessage = `Computer nimmt ${amountToTake} Zuckerl von Haufen ${pileIndex + 1}.`;
+                        
+                        // Sound abspielen
+                        playTakeSound(amountToTake, true); 
+                        
+                        // Zug ansagen und erst DANACH den Spielerzug ermöglichen
+                        speak(computerMessage, () => {
+                            playerTurn = true;
+                            renderPiles();
+                            checkGameOver(); // Prüfung nach dem Rendern und Sprachausgabe
+                        });
+                    } else {
+                        // Sollte nicht passieren, wenn noch Züge möglich sind
+                        console.error("Computer konnte keinen Zug ausführen.");
+                        // Spieler ist trotzdem wieder dran, um Blockade zu verhindern
+                        playerTurn = true; 
+                        renderPiles();
+                        checkGameOver();
+                    }
+                }, 500); // 500ms Denkpause nach "Computer überlegt..."
+            });
         }
 
         // Funktion zum Abspielen des Wegnahme-Sounds - Lautstärke erhöht
@@ -455,7 +491,7 @@
                 if (isComputer) {
                     oscillator.type = 'sawtooth';
                     oscillator.frequency.value = 200 - (amount * 20);
-                    gainNode.gain.value = 0.2; // Lautstärke leicht erhöht
+                    gainNode.gain.value = 0.5; // Lautstärke leicht erhöht
                 } else {
                     oscillator.type = 'triangle';
                     oscillator.frequency.value = 400 + (amount * 30);
@@ -516,13 +552,13 @@
 
         // Spiel initialisieren
         function initGame() {
-            piles = getRandomPiles(4, 1, 9); // Zufällige Haufen beim Start
+            piles = getRandomPiles(6, 3, 9); // Zufällige Haufen beim Start
             renderPiles();
             setupButtons();
             
             // Spielregeln vorlesen
             const rulesText = document.getElementById('rules').textContent;
-            setTimeout(() => speak("Willkommen zum Naschkatze Nim-Spiel! " + rulesText), 500);
+            setTimeout(() => speak("Willkommen zum Naschkatzen-Spiel! " + rulesText), 500);
         }
 
         // Spiel starten
