@@ -29,6 +29,8 @@
             background-color: #fff;
             border-radius: 10px;
             transition: all 0.3s;
+            position: relative; /* Für die Positionierung des Welleneffekts */
+            overflow: hidden; /* Begrenzung des Welleneffekts */
         }
         .pile.selected {
             border-color: #4CAF50;
@@ -90,6 +92,29 @@
             min-height: 30px;
             color: #4CAF50;
         }
+        /* Verbesserte Welleneffekt-Animation */
+        @keyframes ripple {
+            0% {
+                transform: scale(0);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(3);
+                opacity: 0;
+            }
+        }
+        
+        .ripple {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: rgba(76, 175, 80, 0.4); /* Stärkere Farbe */
+            transform: scale(0);
+            animation: ripple 1s cubic-bezier(0, 0.5, 0.5, 1); /* Längere Animation mit besserer Kurve */
+            pointer-events: none;
+            z-index: 10; /* Höherer z-index um sicherzustellen, dass es über anderen Elementen liegt */
+        }
     </style>
 </head>
 <body>
@@ -106,10 +131,28 @@
 
     <script>
         // Spielzustand
-        let piles = [3, 5, 7, 9]; // Vier Haufen mit unterschiedlichen Startwerten
+        // let piles = [3, 5, 7, 9]; // Entferne feste Startwerte
         let playerTurn = true;
         let selectedPile = -1; // -1 bedeutet kein Haufen ausgewählt
         const candyImageUrl = 'https://cdn-icons-png.flaticon.com/512/119/119534.png';
+        let piles = []; // Wird in initGame initialisiert
+
+        // Hilfsfunktion zum Generieren zufälliger Haufengrößen
+        function getRandomPiles(numPiles, minSize, maxSize) {
+            const newPiles = [];
+            for (let i = 0; i < numPiles; i++) {
+                // Zufallszahl zwischen minSize und maxSize (inklusive)
+                const randomSize = Math.floor(Math.random() * (maxSize - minSize + 1)) + minSize;
+                newPiles.push(randomSize);
+            }
+            // Sicherstellen, dass die Nim-Summe am Anfang nicht 0 ist (optional, aber besser für den Start)
+            if (newPiles.reduce((sum, pile) => sum ^ pile, 0) === 0) {
+                 // Wenn Nim-Summe 0 ist, ändere einen Haufen leicht ab
+                 const indexToChange = Math.floor(Math.random() * numPiles);
+                 newPiles[indexToChange] = (newPiles[indexToChange] % maxSize) + 1; // Ändere auf 1, wenn es maxSize war, sonst erhöhe um 1
+            }
+            return newPiles;
+        }
 
         // Rendert die Haufen auf dem Bildschirm
         function renderPiles() {
@@ -122,7 +165,7 @@
                 if (index === selectedPile) {
                     pileDiv.classList.add('selected');
                 }
-                pileDiv.onclick = () => selectPile(index);
+                pileDiv.onclick = (event) => selectPile(index, event); // Event-Objekt übergeben
 
                 const title = document.createElement('div');
                 title.className = 'pile-title';
@@ -153,15 +196,71 @@
             updateButtons();
         }
 
-        // Wählt einen Haufen aus
-        function selectPile(index) {
-            if (!playerTurn || piles[index] === 0) return; // Verhindert Auswahl wenn Computer dran oder Haufen leer ist
+        // Wählt einen Haufen aus - optimiert
+        function selectPile(index, event) {
+            if (!playerTurn || piles[index] === 0) return;
             
-            selectedPile = index;
-            renderPiles(); // Neu rendern, um die Auswahl anzuzeigen
+            // Speichere den aktuellen Auswahlzustand
+            const wasSelected = selectedPile === index;
             
-            const message = `Du hast Haufen ${index + 1} ausgewählt.`;
-            speak(message);
+            // Welleneffekt hinzufügen
+            createRippleEffect(event, index);
+            
+            // Nur wenn sich der Auswahlstatus ändert oder noch kein Haufen ausgewählt war
+            if (!wasSelected) {
+                selectedPile = index;
+                
+                // Wir verzögern das Rendering, um den Welleneffekt zuerst zu sehen
+                setTimeout(() => {
+                    renderPiles();
+                    const message = `Du hast Haufen ${index + 1} ausgewählt.`;
+                    speak(message);
+                }, 300); // Kurze Verzögerung, um den Effekt sichtbar zu machen
+            }
+        }
+        
+        // Erzeugt den Welleneffekt beim Klicken - verbessert
+        function createRippleEffect(e, pileIndex) {
+            // Direktes Ansprechen des Haufen-Elements für den Effekt
+            const pileElements = document.querySelectorAll('.pile');
+            if (!pileElements || pileElements.length <= pileIndex) return;
+            
+            const pileElement = pileElements[pileIndex];
+            
+            // Effizientere Bereinigung existierender Welleneffekte
+            pileElement.querySelectorAll('.ripple').forEach(r => r.remove());
+            
+            // Erstellen und Positionieren des Welleneffekts
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple';
+            
+            // Klickposition berechnen oder Mittelpunkt verwenden
+            const rect = pileElement.getBoundingClientRect();
+            let x, y;
+            
+            if (e && e.clientX) { 
+                // Wenn ein Klick-Event vorliegt, verwende dessen Position
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            } else {
+                // Sonst zentriere den Effekt
+                x = rect.width / 2;
+                y = rect.height / 2;
+            }
+            
+            // Positioniere das Element (60px ist die halbe Breite/Höhe des Ripple)
+            ripple.style.left = `${x - 60}px`;
+            ripple.style.top = `${y - 60}px`;
+            
+            // Füge den Effekt hinzu
+            pileElement.appendChild(ripple);
+            
+            // Entferne das Element nach der Animation
+            setTimeout(() => {
+                if (ripple.parentNode === pileElement) {
+                    pileElement.removeChild(ripple);
+                }
+            }, 1000);
         }
 
         // Aktualisiert den Statustext
@@ -231,9 +330,13 @@
         function playerMove(amount) {
             if (!playerTurn || selectedPile === -1 || piles[selectedPile] < amount) return;
             
+            const originalAmount = piles[selectedPile]; // Menge vor dem Zug
             piles[selectedPile] -= amount;
             const message = `Du hast ${amount} Zuckerl von Haufen ${selectedPile + 1} genommen.`;
             speak(message);
+            
+            // Sound abspielen, wenn Spieler Zuckerl nimmt
+            playTakeSound(amount); // amount ist korrekt hier
             
             selectedPile = -1; // Auswahl zurücksetzen
             playerTurn = false;
@@ -246,34 +349,26 @@
             setTimeout(computerMove, 1500);
         }
 
-        // Berechnet die Nim-Summe (XOR aller Haufen)
-        function calculateNimSum() {
-            return piles.reduce((sum, pile) => sum ^ pile, 0);
-        }
-
-        // Computerzug
+        // Computerzug - Überarbeitet für korrekten Sound-Aufruf
         function computerMove() {
             speak("Computer überlegt...");
             
             setTimeout(() => {
-                // Nim-Strategie: Versuche, nach dem Zug eine Nim-Summe von 0 zu hinterlassen
                 const nimSum = calculateNimSum();
                 let moveMade = false;
-                
+                let pileIndex = -1;
+                let amountToTake = 0; // Variable für die genommene Menge
+
                 if (nimSum !== 0) {
-                    // Perfekte Strategie: Finde einen Haufen, bei dem das XOR von nimSum und 
-                    // der Haufengröße kleiner als die Haufengröße ist
+                    // Perfekte Strategie
                     for (let i = 0; i < piles.length; i++) {
                         if (piles[i] > 0) {
                             const targetSize = piles[i] ^ nimSum;
                             if (targetSize < piles[i]) {
-                                const amountToTake = piles[i] - targetSize;
-                                
-                                // Prüfe, ob der Zug gültig ist (max. 3 Zuckerl)
-                                if (amountToTake <= 3) {
-                                    piles[i] -= amountToTake;
-                                    const message = `Computer nimmt ${amountToTake} Zuckerl von Haufen ${i + 1}.`;
-                                    speak(message);
+                                const potentialAmount = piles[i] - targetSize;
+                                if (potentialAmount <= 3) {
+                                    pileIndex = i;
+                                    amountToTake = potentialAmount;
                                     moveMade = true;
                                     break;
                                 }
@@ -281,17 +376,12 @@
                         }
                     }
                     
-                    // Wenn kein optimaler Zug mit max. 3 Zuckerln gefunden wurde,
-                    // versuche einen alternativen strategischen Zug
+                    // Alternative Strategie
                     if (!moveMade) {
-                        // Suche nach einem Haufen mit mehr als 3 Zuckerln
-                        // und reduziere ihn um 1-3 Zuckerl (was die beste Näherung ist)
                         const largeHaufen = piles.findIndex(pile => pile > 3);
                         if (largeHaufen !== -1) {
-                            // Berechne den besten approximierten Zug
                             let bestAmount = 1;
                             let bestNimSum = calculateNimSumAfterMove(largeHaufen, 1);
-                            
                             for (let amount = 2; amount <= 3; amount++) {
                                 const afterNimSum = calculateNimSumAfterMove(largeHaufen, amount);
                                 if (afterNimSum < bestNimSum) {
@@ -299,21 +389,17 @@
                                     bestAmount = amount;
                                 }
                             }
-                            
-                            piles[largeHaufen] -= bestAmount;
-                            const message = `Computer nimmt ${bestAmount} Zuckerl von Haufen ${largeHaufen + 1}.`;
-                            speak(message);
+                            pileIndex = largeHaufen;
+                            amountToTake = bestAmount;
                             moveMade = true;
                         }
                     }
                 }
 
-                // Wenn die Nim-Summe 0 ist oder kein optimaler Zug gefunden wurde,
-                // mache einen strategischen Zug (entferne ein Zuckerl vom größten Haufen)
+                // Fallback-Strategie
                 if (!moveMade) {
                     let largestPileIndex = -1;
                     let maxCandies = 0;
-                    
                     for (let i = 0; i < piles.length; i++) {
                         if (piles[i] > maxCandies) {
                             maxCandies = piles[i];
@@ -322,35 +408,78 @@
                     }
                     
                     if (largestPileIndex !== -1) {
-                        // Wenn es nur einen nicht-leeren Haufen gibt, nimm alle außer einem
-                        // oder alle, wenn es das letzte Zuckerl ist
+                        pileIndex = largestPileIndex;
                         const nonEmptyPiles = piles.filter(pile => pile > 0).length;
-                        
                         if (nonEmptyPiles === 1) {
-                            // Wenn nur ein Haufen übrig ist und es ungerade viele Zuckerl gibt,
-                            // nimm alle außer einem, sonst alle
-                            const amountToTake = maxCandies === 1 ? 1 : (maxCandies % 2 === 0 ? maxCandies : maxCandies - 1);
-                            const takeAmount = Math.min(3, amountToTake); // Max 3 Zuckerl pro Zug
-                            
-                            piles[largestPileIndex] -= takeAmount;
-                            const message = `Computer nimmt ${takeAmount} Zuckerl von Haufen ${largestPileIndex + 1}.`;
-                            speak(message);
+                            const potentialAmount = maxCandies === 1 ? 1 : (maxCandies % 2 === 0 ? maxCandies : maxCandies - 1);
+                            amountToTake = Math.min(3, potentialAmount);
+                        } else {
+                            amountToTake = Math.min(3, Math.max(1, maxCandies <= 4 ? maxCandies - 1 : 1));
                         }
-                        else {
-                            // Sonst nimm 1 Zuckerl vom größten Haufen
-                            const takeAmount = Math.min(3, Math.max(1, maxCandies <= 4 ? maxCandies - 1 : 1));
-                            
-                            piles[largestPileIndex] -= takeAmount;
-                            const message = `Computer nimmt ${takeAmount} Zuckerl von Haufen ${largestPileIndex + 1}.`;
-                            speak(message);
-                        }
+                        moveMade = true; // Auch hier wurde ein Zug gemacht
                     }
+                }
+
+                // Führe den Zug aus und spiele den Sound
+                if (moveMade && pileIndex !== -1 && amountToTake > 0) {
+                    piles[pileIndex] -= amountToTake;
+                    const message = `Computer nimmt ${amountToTake} Zuckerl von Haufen ${pileIndex + 1}.`;
+                    speak(message);
+                    playTakeSound(amountToTake, true); // Sound hier abspielen
+                } else {
+                    // Sollte nicht passieren, wenn noch Züge möglich sind
+                    console.error("Computer konnte keinen Zug ausführen.");
                 }
                 
                 playerTurn = true;
                 renderPiles();
                 checkGameOver();
             }, 1000);
+        }
+
+        // Funktion zum Abspielen des Wegnahme-Sounds - Lautstärke erhöht
+        function playTakeSound(amount, isComputer = false) {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (!audioContext) {
+                    console.warn("Web Audio API wird nicht unterstützt.");
+                    return;
+                }
+                
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                if (isComputer) {
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.value = 200 - (amount * 20);
+                    gainNode.gain.value = 0.2; // Lautstärke leicht erhöht
+                } else {
+                    oscillator.type = 'triangle';
+                    oscillator.frequency.value = 400 + (amount * 30);
+                    gainNode.gain.value = 0.25; // Lautstärke leicht erhöht
+                }
+                
+                const now = audioContext.currentTime;
+                oscillator.start(now);
+                
+                for (let i = 0; i < amount; i++) {
+                    const startTime = now + (i * 0.15);
+                    gainNode.gain.setValueAtTime(isComputer ? 0.2 : 0.25, startTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
+                }
+                
+                oscillator.stop(now + (amount * 0.15) + 0.1);
+            } catch (error) {
+                console.error("Fehler beim Abspielen des Sounds:", error);
+            }
+        }
+
+        // Berechnet die Nim-Summe (XOR aller Haufen)
+        function calculateNimSum() {
+            return piles.reduce((sum, pile) => sum ^ pile, 0);
         }
 
         // Hilfsfunktion: Berechnet die Nim-Summe nach einem hypothetischen Zug
@@ -373,11 +502,11 @@
                 
                 // Spiel nach kurzer Verzögerung zurücksetzen
                 setTimeout(() => {
-                    piles = [3, 5, 7, 9]; // Startkonfiguration mit 4 Haufen wiederherstellen
+                    piles = getRandomPiles(4, 1, 9); // Zufällige Haufen beim Reset
                     playerTurn = true;
                     selectedPile = -1;
                     renderPiles();
-                    speak("Neues Spiel beginnt!");
+                    speak("Neues Spiel beginnt mit neuen Haufen!");
                 }, 5000);
                 
                 return true;
@@ -387,6 +516,7 @@
 
         // Spiel initialisieren
         function initGame() {
+            piles = getRandomPiles(4, 1, 9); // Zufällige Haufen beim Start
             renderPiles();
             setupButtons();
             
