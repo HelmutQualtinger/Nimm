@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Naschkatze</title>
+    <title>Naschkatze - Nim-Spiel</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,124 +12,391 @@
             padding: 0;
             background-color: #f4f4f4;
         }
-        .candies {
-            margin: 20px auto;
+        .game-container {
             display: flex;
-            flex-wrap: wrap;
+            justify-content: space-around;
+            flex-wrap: wrap; /* Wichtig für die Anordnung von 4 Haufen */
+            margin: 20px auto;
+            max-width: 90%;
+        }
+        .pile {
+            border: 2px solid #ccc;
+            padding: 15px;
+            margin: 10px;
+            min-width: 120px; /* Etwas schmaler für 4 Haufen */
+            max-width: 22%; /* Begrenzt die Breite für besseres Layout bei 4 Haufen */
+            cursor: pointer;
+            background-color: #fff;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .pile.selected {
+            border-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        .pile-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .candies {
+            display: grid;
             justify-content: center;
+            gap: 10px;
         }
         .candy {
             width: 40px;
             height: 40px;
-            margin: 5px;
-            background-color: #ff6347; /* Tomatenrot für realistischere Bonbons */
-            border-radius: 50%;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-            position: relative;
+            display: block;
         }
-
-        .candy::before, .candy::after {
-            content: '';
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background-color: #fff;
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        .buttons-container {
+            margin: 20px 0;
         }
         button {
             margin: 10px;
-            padding: 10px 20px;
+            padding: 10px;
             font-size: 16px;
+            vertical-align: middle;
+            line-height: 1;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #e0e0e0;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        button img {
+            width: 20px;
+            height: 20px;
+            margin: 0 2px;
+            vertical-align: middle;
+        }
+        #rules {
+            font-style: italic;
+            margin: 20px auto;
+            padding: 15px;
+            max-width: 80%;
+            background-color: #f8f8f8;
+            border-radius: 8px;
+        }
+        #spokenText {
+            margin-top: 20px;
+            font-size: 18px;
+            min-height: 30px;
+            color: #4CAF50;
         }
     </style>
 </head>
 <body>
-    <h1>Naschkatze</h1>
-    <p id="status">Verbleibende Zuckerl: 18</p>
-    <div class="candies" id="candies"></div>
-    <p>Drücke auf einen der Buttons, um Zuckerl zu nehmen:</p>
-    <button onclick="playerMove(1)">1 Zuckerl</button>
-    <button onclick="playerMove(2)">2 Zuckerl</button>
-    <button onclick="playerMove(3)">3 Zuckerl</button>
-    <p id="rules" style="font-style: italic; position: absolute; bottom: 10px; width: 100%;">Spielregeln: Es gibt 18 Zuckerl. Du und der Computer nehmen abwechselnd 1, 2 oder 3 Zuckerl. Wer das letzte Zuckerl nimmt, verliert.</p>
-    <div id="spokenText" style="margin-top: 20px; font-size: 18px;"></div>
+    <h1>Naschkatze - Nim-Spiel</h1>
+    <p id="status">Wähle einen Haufen und nimm dann 1, 2 oder 3 Zuckerl.</p>
+    <div class="game-container" id="game-container"></div>
+    <div class="buttons-container">
+        <button id="btn-1" onclick="playerMove(1)" disabled></button>
+        <button id="btn-2" onclick="playerMove(2)" disabled></button>
+        <button id="btn-3" onclick="playerMove(3)" disabled></button>
+    </div>
+    <p id="rules">Spielregeln: Es gibt vier Haufen Zuckerl. Du und der Computer nehmen abwechselnd 1, 2 oder 3 Zuckerl von einem Haufen. Wer das letzte Zuckerl nimmt, verliert.</p>
+    <div id="spokenText"></div>
 
     <script>
-        let candies = 18;
+        // Spielzustand
+        let piles = [3, 5, 7, 9]; // Vier Haufen mit unterschiedlichen Startwerten
         let playerTurn = true;
+        let selectedPile = -1; // -1 bedeutet kein Haufen ausgewählt
+        const candyImageUrl = 'https://cdn-icons-png.flaticon.com/512/119/119534.png';
 
-        function renderCandies() {
-            const candiesDiv = document.getElementById('candies');
-            candiesDiv.innerHTML = '';
-            for (let i = 0; i < candies; i++) {
-                const candy = document.createElement('div');
-                candy.className = 'candy';
-                candiesDiv.appendChild(candy);
-            }
-            document.getElementById('status').textContent = `Verbleibende Zuckerl: ${candies}`;
+        // Rendert die Haufen auf dem Bildschirm
+        function renderPiles() {
+            const gameContainer = document.getElementById('game-container');
+            gameContainer.innerHTML = '';
+
+            piles.forEach((count, index) => {
+                const pileDiv = document.createElement('div');
+                pileDiv.className = 'pile';
+                if (index === selectedPile) {
+                    pileDiv.classList.add('selected');
+                }
+                pileDiv.onclick = () => selectPile(index);
+
+                const title = document.createElement('div');
+                title.className = 'pile-title';
+                title.textContent = `Haufen ${index + 1} (${count})`;
+                pileDiv.appendChild(title);
+
+                const candiesDiv = document.createElement('div');
+                candiesDiv.className = 'candies';
+                
+                // Bestimme die Anzahl der Spalten basierend auf der Anzahl der Zuckerl
+                const cols = Math.min(5, Math.ceil(Math.sqrt(count)));
+                candiesDiv.style.gridTemplateColumns = `repeat(${cols}, auto)`;
+
+                // Füge die Zuckerbilder hinzu
+                for (let i = 0; i < count; i++) {
+                    const img = document.createElement('img');
+                    img.src = candyImageUrl;
+                    img.alt = 'Zuckerl';
+                    img.className = 'candy';
+                    candiesDiv.appendChild(img);
+                }
+
+                pileDiv.appendChild(candiesDiv);
+                gameContainer.appendChild(pileDiv);
+            });
+
+            updateStatus();
+            updateButtons();
         }
 
+        // Wählt einen Haufen aus
+        function selectPile(index) {
+            if (!playerTurn || piles[index] === 0) return; // Verhindert Auswahl wenn Computer dran oder Haufen leer ist
+            
+            selectedPile = index;
+            renderPiles(); // Neu rendern, um die Auswahl anzuzeigen
+            
+            const message = `Du hast Haufen ${index + 1} ausgewählt.`;
+            speak(message);
+        }
+
+        // Aktualisiert den Statustext
+        function updateStatus() {
+            const status = document.getElementById('status');
+            if (playerTurn) {
+                if (selectedPile === -1) {
+                    status.textContent = 'Wähle einen Haufen, von dem du Zuckerl nehmen möchtest.';
+                } else {
+                    status.textContent = `Haufen ${selectedPile + 1} ausgewählt. Wie viele Zuckerl möchtest du nehmen?`;
+                }
+            } else {
+                status.textContent = 'Computer ist am Zug...';
+            }
+        }
+
+        // Aktualisiert die Buttons (aktivieren/deaktivieren)
+        function updateButtons() {
+            const btn1 = document.getElementById('btn-1');
+            const btn2 = document.getElementById('btn-2');
+            const btn3 = document.getElementById('btn-3');
+            
+            // Buttons aktivieren/deaktivieren basierend auf der Auswahl und verfügbaren Zuckerln
+            const canSelect = selectedPile !== -1 && playerTurn;
+            const selectedCount = canSelect ? piles[selectedPile] : 0;
+            
+            btn1.disabled = !canSelect || selectedCount < 1;
+            btn2.disabled = !canSelect || selectedCount < 2;
+            btn3.disabled = !canSelect || selectedCount < 3;
+        }
+
+        // Zeigt Text in der Sprechblase an
         function updateSpokenText(message) {
             const spokenTextDiv = document.getElementById('spokenText');
             spokenTextDiv.textContent = message;
-            spokenTextDiv.style.color = 'green';
         }
 
+        // Text vorlesen und anzeigen
         function speak(text) {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'de-DE';
-            utterance.voice = speechSynthesis.getVoices().find(voice => voice.name === 'Viktor');
             speechSynthesis.speak(utterance);
             updateSpokenText(text);
         }
 
+        // Setzt die Bilder auf den Buttons
+        function setupButtons() {
+            const buttons = [
+                { id: 'btn-1', amount: 1 },
+                { id: 'btn-2', amount: 2 },
+                { id: 'btn-3', amount: 3 }
+            ];
+
+            buttons.forEach(btnInfo => {
+                const button = document.getElementById(btnInfo.id);
+                button.innerHTML = '';
+                for (let i = 0; i < btnInfo.amount; i++) {
+                    const img = document.createElement('img');
+                    img.src = candyImageUrl;
+                    img.alt = `${btnInfo.amount} Zuckerl`;
+                    button.appendChild(img);
+                }
+            });
+        }
+
+        // Spielerzug
         function playerMove(amount) {
-            if (!playerTurn || candies < amount) return;
-            candies -= amount;
-            const message = `Du hast ${amount} Zuckerl genommen. Verbleibende Zuckerl: ${candies}`;
+            if (!playerTurn || selectedPile === -1 || piles[selectedPile] < amount) return;
+            
+            piles[selectedPile] -= amount;
+            const message = `Du hast ${amount} Zuckerl von Haufen ${selectedPile + 1} genommen.`;
             speak(message);
+            
+            selectedPile = -1; // Auswahl zurücksetzen
             playerTurn = false;
-            renderCandies();
-            checkGameOver();
-            if (!playerTurn) setTimeout(computerMove, 1000);
+            
+            renderPiles();
+            
+            if (checkGameOver()) return;
+            
+            // Computer ist dran nach kurzer Verzögerung
+            setTimeout(computerMove, 1500);
         }
 
+        // Berechnet die Nim-Summe (XOR aller Haufen)
+        function calculateNimSum() {
+            return piles.reduce((sum, pile) => sum ^ pile, 0);
+        }
+
+        // Computerzug
         function computerMove() {
-            let aiMove = (candies - 1) % 4;
-            if (aiMove === 0 || aiMove > candies) {
-                aiMove = Math.min(3, candies);
-            }
-            candies -= aiMove;
-            const message = `Computer hat ${aiMove} Zuckerl genommen. Verbleibende Zuckerl: ${candies}`;
-            speak(message);
-            playerTurn = true;
-            renderCandies();
-            checkGameOver();
-        }
+            speak("Computer überlegt...");
+            
+            setTimeout(() => {
+                // Nim-Strategie: Versuche, nach dem Zug eine Nim-Summe von 0 zu hinterlassen
+                const nimSum = calculateNimSum();
+                let moveMade = false;
+                
+                if (nimSum !== 0) {
+                    // Perfekte Strategie: Finde einen Haufen, bei dem das XOR von nimSum und 
+                    // der Haufengröße kleiner als die Haufengröße ist
+                    for (let i = 0; i < piles.length; i++) {
+                        if (piles[i] > 0) {
+                            const targetSize = piles[i] ^ nimSum;
+                            if (targetSize < piles[i]) {
+                                const amountToTake = piles[i] - targetSize;
+                                
+                                // Prüfe, ob der Zug gültig ist (max. 3 Zuckerl)
+                                if (amountToTake <= 3) {
+                                    piles[i] -= amountToTake;
+                                    const message = `Computer nimmt ${amountToTake} Zuckerl von Haufen ${i + 1}.`;
+                                    speak(message);
+                                    moveMade = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Wenn kein optimaler Zug mit max. 3 Zuckerln gefunden wurde,
+                    // versuche einen alternativen strategischen Zug
+                    if (!moveMade) {
+                        // Suche nach einem Haufen mit mehr als 3 Zuckerln
+                        // und reduziere ihn um 1-3 Zuckerl (was die beste Näherung ist)
+                        const largeHaufen = piles.findIndex(pile => pile > 3);
+                        if (largeHaufen !== -1) {
+                            // Berechne den besten approximierten Zug
+                            let bestAmount = 1;
+                            let bestNimSum = calculateNimSumAfterMove(largeHaufen, 1);
+                            
+                            for (let amount = 2; amount <= 3; amount++) {
+                                const afterNimSum = calculateNimSumAfterMove(largeHaufen, amount);
+                                if (afterNimSum < bestNimSum) {
+                                    bestNimSum = afterNimSum;
+                                    bestAmount = amount;
+                                }
+                            }
+                            
+                            piles[largeHaufen] -= bestAmount;
+                            const message = `Computer nimmt ${bestAmount} Zuckerl von Haufen ${largeHaufen + 1}.`;
+                            speak(message);
+                            moveMade = true;
+                        }
+                    }
+                }
 
-        function announceVictory(message) {
-            speak(message);
-            const status = document.getElementById('status');
-            status.style.color = 'green';
-            status.textContent = message;
-        }
-
-        function checkGameOver() {
-            if (candies === 0) {
-                const message = playerTurn ? 'Spiel vorbei! Du hast gewonnen!' : 'Spiel vorbei! Der Computer hat gewonnen!';
-                alert(message);
-                announceVictory(message);
-                candies = 18;
+                // Wenn die Nim-Summe 0 ist oder kein optimaler Zug gefunden wurde,
+                // mache einen strategischen Zug (entferne ein Zuckerl vom größten Haufen)
+                if (!moveMade) {
+                    let largestPileIndex = -1;
+                    let maxCandies = 0;
+                    
+                    for (let i = 0; i < piles.length; i++) {
+                        if (piles[i] > maxCandies) {
+                            maxCandies = piles[i];
+                            largestPileIndex = i;
+                        }
+                    }
+                    
+                    if (largestPileIndex !== -1) {
+                        // Wenn es nur einen nicht-leeren Haufen gibt, nimm alle außer einem
+                        // oder alle, wenn es das letzte Zuckerl ist
+                        const nonEmptyPiles = piles.filter(pile => pile > 0).length;
+                        
+                        if (nonEmptyPiles === 1) {
+                            // Wenn nur ein Haufen übrig ist und es ungerade viele Zuckerl gibt,
+                            // nimm alle außer einem, sonst alle
+                            const amountToTake = maxCandies === 1 ? 1 : (maxCandies % 2 === 0 ? maxCandies : maxCandies - 1);
+                            const takeAmount = Math.min(3, amountToTake); // Max 3 Zuckerl pro Zug
+                            
+                            piles[largestPileIndex] -= takeAmount;
+                            const message = `Computer nimmt ${takeAmount} Zuckerl von Haufen ${largestPileIndex + 1}.`;
+                            speak(message);
+                        }
+                        else {
+                            // Sonst nimm 1 Zuckerl vom größten Haufen
+                            const takeAmount = Math.min(3, Math.max(1, maxCandies <= 4 ? maxCandies - 1 : 1));
+                            
+                            piles[largestPileIndex] -= takeAmount;
+                            const message = `Computer nimmt ${takeAmount} Zuckerl von Haufen ${largestPileIndex + 1}.`;
+                            speak(message);
+                        }
+                    }
+                }
+                
                 playerTurn = true;
-                renderCandies();
-            }
+                renderPiles();
+                checkGameOver();
+            }, 1000);
         }
 
-        renderCandies();
+        // Hilfsfunktion: Berechnet die Nim-Summe nach einem hypothetischen Zug
+        function calculateNimSumAfterMove(pileIndex, amount) {
+            const newPiles = [...piles];
+            newPiles[pileIndex] -= amount;
+            return newPiles.reduce((sum, pile) => sum ^ pile, 0);
+        }
+
+        // Prüft ob das Spiel vorbei ist
+        function checkGameOver() {
+            const remainingCandies = piles.reduce((sum, pile) => sum + pile, 0);
+            if (remainingCandies === 0) {
+                const message = playerTurn ? 
+                    'Spiel vorbei! Der Computer hat das letzte Zuckerl genommen. Du hast gewonnen!' : 
+                    'Spiel vorbei! Du hast das letzte Zuckerl genommen. Der Computer hat gewonnen!';
+                
+                speak(message);
+                document.getElementById('status').textContent = message;
+                
+                // Spiel nach kurzer Verzögerung zurücksetzen
+                setTimeout(() => {
+                    piles = [3, 5, 7, 9]; // Startkonfiguration mit 4 Haufen wiederherstellen
+                    playerTurn = true;
+                    selectedPile = -1;
+                    renderPiles();
+                    speak("Neues Spiel beginnt!");
+                }, 5000);
+                
+                return true;
+            }
+            return false;
+        }
+
+        // Spiel initialisieren
+        function initGame() {
+            renderPiles();
+            setupButtons();
+            
+            // Spielregeln vorlesen
+            const rulesText = document.getElementById('rules').textContent;
+            setTimeout(() => speak("Willkommen zum Naschkatze Nim-Spiel! " + rulesText), 500);
+        }
+
+        // Spiel starten
+        initGame();
     </script>
 </body>
 </html>
